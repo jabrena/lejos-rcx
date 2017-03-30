@@ -1,0 +1,18 @@
+How to install the lego usb tower with linux
+--------------------------------------------
+
+- Make sure you are using kernel >= 2.6.
+
+- Load the lego usb tower module if necessary: 
+    modprobe legousbtower
+
+- Create node for /dev/usb/lego0: 
+    mknod /dev/usb/lego0 c 180 160
+- Create node for /dev/usb/lego1 up to /dev/usb/lego15 if necessary: 
+    mknod /dev/usb/lego1 c 180 161
+    mknod /dev/usb/lego2 c 180 162
+    ...
+    
+- Make sure you have the permissions to access these devices, e.g.:
+    chmod 666 /dev/usb/legousbtower0
+	...

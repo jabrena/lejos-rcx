@@ -1,0 +1,244 @@
+<!--
+  ==================================================
+  Buildfile for building the cvs TOT of leJOS
+  ==================================================
+-->
+<project name="leJOS" default="build" basedir=".">
+	
+	<!-- Setting up the global properties for the build -->
+  	<property file="build.properties"/>
+	<property environment="env"/>
+	<property name="lejos.root" value="${basedir}"/>
+	<property name="3rdparty.libs" value="${lejos.root}/3rdparty/lib" />
+	<property name="bin" value="${lejos.root}/bin"/>
+	<property name="lib" value="${lejos.root}/lib"/>
+	<property name="src" value="${lejos.root}/src"/>
+	<property name="javasrc" value="${src}/java"/>
+	<property name="javavm.src" value="${src}/javavm"/>
+	<property name="emu.src" value="${src}/tools/emu-lejos"/>
+	<property name="irctrcx.lib.src" value="${src}/comms/libirtrcx"/>
+	<property name="jirctrcx.lib.src" value="${src}/comms/libjirtrcx"/>
+	<property name="plat.unix.src" value="${src}/platform/unix"/>
+	<property name="plat.rcx.src" value="${src}/platform/rcx"/>
+	<property name="fastdl.src" value="${src}/comms/tools/fastdl"/>
+	<property name="test.root" value="${lejos.root}/test"/>
+	<property name="make.out" value="${bin}"/>
+	<property name="build.tmp" value="${lejos.root}/build"/>
+	<!-- org.lejos settings (adjust when required) -->
+	<property name="org.lejos" value="${lejos.root}/../org.lejos"/>
+	<property name="org.lejos.lib" value="${org.lejos}/lib"/>
+	<property name="org.lejos.src" value="${org.lejos}/src"/>
+	<property name="org.lejos.driver.win32.dir" value="${org.lejos}/os/win32/x86"/>
+	<property name="org.lejos.driver.linux.dir" value="${org.lejos}/os/linux/x86"/>
+
+	<!-- cpptasks task & type def -->
+	<taskdef resource="cpptasks.tasks">
+	  <classpath>
+	    <pathelement location="${3rdparty.libs}/cpptasks.jar"/>
+	  </classpath>
+	</taskdef>
+	<typedef resource="cpptasks.types">
+	  <classpath>
+	    <pathelement location="${3rdparty.libs}/cpptasks.jar"/>
+	  </classpath>
+	</typedef>
+	
+	<!-- build leJOS --> 
+	<target name="build" depends ="irctrcx.libs,jirctrcx.libs,lejos.libs,emulator,emu.runtime,lejos.firmware" 
+		description="builds leJOS">
+		<!-- adjust permissions -->
+		<chmod perm="755">
+			<fileset dir="${bin}">
+		</fileset>
+		</chmod>
+	</target>
+
+	<!-- cleans the distribution -->
+	<target name="clean" description="clean up all generated files">
+	    <!-- delete generated files -->
+	  	<delete file="${javasrc}/tools/js/tinyvm/SpecialClassConstants.java"/>
+	  	<delete file="${javasrc}/tools/js/tinyvm/SpecialSignatureConstants.java"/>
+		<!-- delete generated artifacts -->
+	  	<delete>
+	  		<fileset dir="${bin}">
+				<include name="*.so"/>
+				<include name="*.dll"/>
+				<include name="*.dylib"/>
+				<include name="*.jnilib"/>
+			</fileset>
+	  		<fileset dir="${lib}">
+				<include name="*.jar"/>
+			</fileset>
+	  	</delete>
+		<!-- delete compiled and generated artifacts -->
+		<delete>
+			<fileset dir="${lejos.root}"> 
+				<include name="**/*.o"/>
+				<include name="**/*~"/>
+				<include name="**/*.core"/>
+				<include name="**/*.tvm"/>
+				<include name="**/*.class"/>
+				<include name="**/*.bin"/>
+				<include name="**/*.sig"/>
+				<include name="**/*.bak"/>
+				<include name="**/*.stackdump"/>
+				<include name="**/*.backtrace"/>
+				<include name="**/*.#"/>
+				<include name="**/*.lst"/>
+				<include name="**/*.log"/>
+			</fileset>
+		</delete>
+	</target>
+ 	
+	<!-- builds the irctrcx libraries -->
+	<target name="irctrcx.libs" description="builds the irctrcx libraries">
+		<exec executable="make" failonerror="true" dir="${irctrcx.lib.src}">
+			<arg line="OSTYPE=${lejos.ostype} LEJOS_HOME=${lejos.root} BIN_TARGET=${make.out}"/>
+		</exec> 
+	</target>
+
+	<!-- builds the jirctrcx libraries -->
+	<target name="jirctrcx.libs" depends="irctrcx.libs" description="builds the jirctrcx libraries">
+		<exec executable="make" failonerror="true" dir="${jirctrcx.lib.src}">
+			<arg line="OSTYPE=${lejos.ostype} LEJOS_HOME=${lejos.root} BIN_TARGET=${make.out} TRACE=${trace}"/>
+		</exec> 
+  	</target>
+
+	<!-- create all lejos library jar files  -->
+	<target name="lejos.libs" depends="classes.jar, rcxcomm.jar, pcrcxcomm.jar, vision.jar, jtools.jar" description="make all lejos library jars">
+	</target>
+  				
+  	<!-- creates the classes jar (RCX: JDK 1.1) -->
+  	<target name="classes.jar" description="generate classes jar">
+    	<mkdir dir="${build.tmp}/classes"/>
+    	<javac srcdir="${javasrc}/classes" destdir="${build.tmp}/classes" fork="yes" optimize="on" debug="on" source="1.3" target="1.1"/>
+    	<jar destfile="${lib}/classes.jar" basedir="${build.tmp}/classes" update="false"/>
+  	</target>
+
+  	<!--creates the rcxcomm jar (RCX: JDK 1.1) -->
+  	<target name="rcxcomm.jar" depends="classes.jar" description="generate rcxcomm jar">
+    	<mkdir dir="${build.tmp}/rcxcomm"/>
+    	<javac srcdir="${javasrc}/rcxcomm" destdir="${build.tmp}/rcxcomm" fork="yes" optimize="on" debug="on" source="1.3" target="1.1">
+      		<classpath location="${lib}/classes.jar"/>
+    	</javac>
+    	<jar destfile="${lib}/rcxcomm.jar" basedir="${build.tmp}/rcxcomm" update="false"/>
+  	</target>
+
+  	<!--creates the pcrcxcomm jar (PC: JDK 1.4) -->
+  	<target name="pcrcxcomm.jar" description="generate pcrcxcomm jar">
+    	<mkdir dir="${build.tmp}/pcrcxcomm"/>
+    	<javac srcdir="${javasrc}/pcrcxcomm" destdir="${build.tmp}/pcrcxcomm" fork="yes" optimize="on" debug="on" source="1.4"/>
+    	<jar destfile="${lib}/pcrcxcomm.jar" basedir="${build.tmp}/pcrcxcomm" update="false"/>
+  	</target>
+
+  	<!--creates the vision jar (PC: JDK 1.4) -->
+  	<target name="vision.jar" depends="pcrcxcomm.jar" description="generate vision jar">
+    	<mkdir dir="${build.tmp}/vision"/>
+    	<copy todir="${build.tmp}/vision">
+      		<fileset dir="${javasrc}/vision">
+        		<include name="**/*.properties"/>
+      		</fileset>
+    	</copy>
+    	<javac srcdir="${javasrc}/vision" destdir="${build.tmp}/vision" fork="yes" optimize="on" debug="on" source="1.4">
+      		<classpath path="${3rdparty.libs}/jmf.jar;${lib}/pcrcxcomm.jar" />
+    	</javac>
+    	<jar destfile="${lib}/vision.jar" basedir="${build.tmp}/vision" update="false"/>
+  	</target>
+
+  	<!-- creates the jtools jar (PC: JDK 1.4) -->
+  	<target name="jtools.jar" depends="pcrcxcomm.jar" description="generate jtools jar">
+    	<mkdir dir="${build.tmp}/tools"/>
+    	<!-- generate constants first -->
+    	<javac srcdir="${javasrc}/tools" destdir="${build.tmp}/tools" fork="yes" optimize="on" debug="on" source="1.4" 
+    		includes="**/GenerateConstants.java">
+    	</javac>
+   		<java classpath="${build.tmp}/tools" classname="js.tinyvm.GenerateConstants">
+      		<sysproperty key="tinyvm.home" value="${src}"/>
+    	</java>
+    	<!-- generate tools -->
+    	<javac srcdir="${javasrc}/tools" destdir="${build.tmp}/tools" fork="yes" optimize="on" debug="on" source="1.4">
+      		<classpath location="${lib}/pcrcxcomm.jar"/>
+      		<classpath location="${3rdparty.libs}/commons-cli-1.0.jar"/>
+      		<classpath location="${3rdparty.libs}/bcel-5.1.jar"/>
+    	</javac>
+    	<jar destfile="${lib}/jtools.jar" basedir="${build.tmp}/tools" update="false">
+    	</jar>
+  	</target>
+  		
+  	<!-- builds the emulator -->
+  	<target name="emulator" description="builds the emulator">
+		<exec executable="make" failonerror="true" dir="${emu.src}">
+			<arg line="OSTYPE=${lejos.ostype} LEJOS_HOME=${lejos.root} BIN_TARGET=${make.out} TRACE=${trace}"/>
+		</exec> 
+  	</target>
+	  	
+  	<!-- builds the emu runtime tools (emu-dump & emu-lejosrun) -->
+  	<target name="emu.runtime" depends="emulator" description="builds the emu runtime tools">
+  		<ant antfile="${plat.unix.src}/build.xml" dir="${plat.unix.src}" inheritall="true" />
+  	</target>
+  		
+	<!-- packages the lejos firmware files -->	
+ 	<target name="lejos.firmware" depends="jtools.jar,lejos.srec" description="packages the lejos firmware">
+  		<!-- update jtools.jar -->
+		<jar destfile="${lib}/jtools.jar" basedir="${build.tmp}/tools" update="true">
+			<fileset dir="${bin}">
+        		<include name="lejos.srec"/>
+        		<include name="fastdl2x.srec"/>
+        		<include name="fastdl4x.srec"/> 
+			</fileset> 
+		</jar>
+ 	</target>
+ 		
+  	<!-- builds the lejos firmware (*.srec) -->
+  	<target name="lejos.srec" description="builds the lejos firmware (*.srec)" if="build.lejos.firmware">
+  		<exec executable="make" failonerror="true" dir="${plat.rcx.src}">
+  			<arg line="OSTYPE=${lejos.ostype} LEJOS_HOME=${lejos.root} BIN_TARGET=${make.out}"/>
+		</exec>
+		<exec executable="make" failonerror="true" dir="${fastdl.src}">
+  			<arg line="OSTYPE=${lejos.ostype} LEJOS_HOME=${lejos.root} BIN_TARGET=${make.out}"/>
+  		</exec>
+  	</target>
+	
+	<!-- deploys the distribution to org.lejos -->
+	<target name="deploy.to.org.lejos" description="deploys the distribution to org.lejos">
+		<!-- all leJOS libs -->
+		<mkdir dir="${org.lejos.lib}"/>
+			<delete>
+  				<fileset dir="${org.lejos.lib}">
+				<include name="*.jar"/>
+  			</fileset>
+		</delete>
+		<copy todir="${org.lejos.lib}">
+  			<fileset dir="${lib}">
+				<include name="*.jar"/>
+  			</fileset>
+		</copy>
+		<!-- sources for all leJOS and external libs -->
+		<mkdir dir="${org.lejos.src}"/>
+			<delete>
+  				<fileset dir="${org.lejos.src}">
+					<include name="*.zip"/>
+  			</fileset>
+		</delete>
+		<copy todir="${org.lejos.src}">
+  			<fileset dir="${src}">
+				<include name="*.zip"/>
+  			</fileset>
+		</copy>
+		<!-- OS specific drivers (win32) -->
+		<mkdir dir="${org.lejos.driver.win32.dir}"/>
+   		<copy todir="${org.lejos.driver.win32.dir}" overwrite="true">
+  			<fileset dir="${bin}">
+				<include name="*.dll"/>
+  			</fileset>
+		</copy>
+		<!-- OS specific drivers (linux) -->
+		<mkdir dir="${org.lejos.driver.linux.dir}"/>
+		<copy todir="${org.lejos.driver.linux.dir}" overwrite="true">
+  			<fileset dir="${bin}">
+				<include name="*.so"/>
+  			</fileset>
+		</copy>
+  	</target>   
+	
+</project>
